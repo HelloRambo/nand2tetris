@@ -24,7 +24,6 @@
  * CPU jumps to address 0 (i.e. pc is set to 0 in next time step) rather 
  * than to the address resulting from executing the current instruction. 
  */
-
 CHIP CPU {
 
     IN  inM[16],         // M value input  (M = contents of RAM[A])
@@ -40,4 +39,37 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
-}
+
+    //the first mux
+    Mux16(a=instruction, b=outALU, sel=instruction[15], out=outMux1);
+
+    //A register  output depand on instruction[15] and instruction[5]
+    Not(in=instruction[15], out=outNOT);
+    Or(a=outNOT, b=instruction[5], out=outAND);
+    ARegister(in=outMux1, load=outAND, out=outA, out[0..14]=addressM);
+
+    //the second mux
+    Mux16(a=outA, b=inM, sel=instruction[12], out=outAM);
+    
+    //the D register
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    DRegister(in=outALU, load=loadD, out=outD);
+
+    //ALU
+    ALU(x=outD, y=outAM, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=outALU, out=outM, zr=zr, ng=ng);
+    
+    //writeM
+    And(a=instruction[3], b=instruction[15], out=writeM);
+
+    //PC
+    Not(in=zr, out=notzr);
+    Not(in=ng, out=notng);
+    And(a=notzr, b=notng, out=ps);
+    And(a=ng, b=instruction[2], out=and1);
+    And(a=zr, b=instruction[1], out=and2);
+    And(a=ps, b=instruction[0], out=and3);
+    Or(a=and1, b=and2, out=or1);
+    Or(a=or1, b=and3, out=or2);
+    And(a=or2, b=instruction[15], out=outAnd3);
+    PC(in=outAM, load=outAnd3, reset=reset, inc=true, out[0..14]=pc);   
+  }
